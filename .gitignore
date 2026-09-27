@@ -8,3 +8,9 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment variables (may contain secrets)
+.env
+
+# macOS
+.DS_Store

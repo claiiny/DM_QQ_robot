@@ -40,13 +40,17 @@ async def chat(user_message: str) -> str:
     Returns:
         AI 生成的回复文本
     """
-    client = _get_client()
-    messages = []
-    if settings.ai_system_prompt:
-        messages.append({"role": "system", "content": settings.ai_system_prompt})
-    messages.append({"role": "user", "content": user_message})
+    if not settings.ai_api_key:
+        logger.warning("AI_API_KEY not configured, skipping AI chat")
+        return "AI 服务未配置"
 
     try:
+        client = _get_client()
+        messages = []
+        if settings.ai_system_prompt:
+            messages.append({"role": "system", "content": settings.ai_system_prompt})
+        messages.append({"role": "user", "content": user_message})
+
         resp = await client.chat.completions.create(
             model=settings.ai_model,
             messages=messages,

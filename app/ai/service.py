@@ -21,6 +21,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _client: AsyncOpenAI | None = None
+_vision_client: AsyncOpenAI | None = None
 
 _group_openid_var: ContextVar[str] = ContextVar("group_openid", default="")
 _msg_id_var: ContextVar[str] = ContextVar("msg_id", default="")
@@ -60,6 +61,17 @@ def _get_client() -> AsyncOpenAI:
     return _client
 
 
+def _get_vision_client() -> AsyncOpenAI:
+    """获取多模态模型客户端实例（懒初始化，优先使用视觉专用配置）。"""
+    global _vision_client
+    if _vision_client is None:
+        _vision_client = AsyncOpenAI(
+            api_key=settings.ai_vision_api_key or settings.ai_api_key,
+            base_url=settings.ai_vision_base_url or settings.ai_base_url or None,
+        )
+    return _vision_client
+
+
 async def chat(user_id: str, user_message: str, image_urls: list[str] | None = None) -> str:
     """调用 AI 模型生成回复，带用户级对话记忆和工具调用。
 
@@ -78,8 +90,9 @@ async def chat(user_id: str, user_message: str, image_urls: list[str] | None = N
         logger.warning("AI_API_KEY not configured, skipping AI chat")
         return "AI 服务未配置"
 
+    has_images = bool(image_urls) and bool(settings.ai_vision_model)
     try:
-        client = _get_client()
+        client = _get_vision_client() if has_images else _get_client()
         reply = await _chat_with_tools(client, user_id, user_message, image_urls)
         await memory.save_exchange(user_id, user_message, reply)
         return reply

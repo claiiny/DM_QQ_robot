@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     ai_model: str = "gpt-4o-mini"
     ai_memory_max: int = 20
 
+    bocha_api_key: str = ""
+
     redis_host: str = "127.0.0.1"
     redis_port: int = 6379
     redis_db: int = 0

@@ -1,7 +1,8 @@
 """AI 对话记忆管理子模块。
 
-基于 Redis 为每个用户维护独立的对话上下文，
-支持最大长度限制，超出时自动裁剪最早的消息。
+基于 Redis 为每个用户维护独立的对话上下文（热数据），
+支持最大长度限制，超出时自动裁剪最早的消息并持久化到 PostgreSQL（冷数据）。
+服务重启时从 PostgreSQL 恢复上下文。
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import logging
 import redis.asyncio as aioredis
 
 from app.config import settings
+from app.repositories import memory_repo
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,8 @@ def _memory_key(user_id: str) -> str:
 async def get_history(user_id: str) -> list[dict]:
     """获取指定用户的对话历史。
 
+    优先从 Redis 读取；若 Redis 无数据，则从 PostgreSQL 恢复最近的历史。
+
     Args:
         user_id: 用户唯一标识（member_openid）
 
@@ -49,42 +53,59 @@ async def get_history(user_id: str) -> list[dict]:
     """
     r = await _get_redis()
     data = await r.get(_memory_key(user_id))
-    if data is None:
-        return []
-    try:
-        return json.loads(data)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning("Failed to parse memory for user %s, resetting", user_id)
-        await r.delete(_memory_key(user_id))
-        return []
+
+    if data is not None:
+        try:
+            return json.loads(data)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("Failed to parse memory for user %s, resetting", user_id)
+            await r.delete(_memory_key(user_id))
+
+    history = await memory_repo.load_recent_history(user_id, settings.ai_memory_max)
+    if history:
+        await r.set(_memory_key(user_id), json.dumps(history, ensure_ascii=False))
+        logger.info("Restored %d messages from database for user %s", len(history), user_id)
+
+    return history
 
 
-async def append_message(user_id: str, role: str, content: str) -> None:
-    """向指定用户的对话历史追加一条消息。
+async def save_exchange(user_id: str, user_msg: str, assistant_msg: str) -> None:
+    """保存一轮完整的对话（用户消息 + AI 回复）。
 
-    超出最大长度时，裁剪最早的消息（保留 system prompt 之外的消息）。
+    追加两条消息到 Redis，超出最大长度时裁剪最早的消息并持久化到 PostgreSQL。
 
     Args:
         user_id: 用户唯一标识
-        role: 消息角色（user / assistant）
-        content: 消息内容
+        user_msg: 用户发送的消息
+        assistant_msg: AI 生成的回复
     """
     history = await get_history(user_id)
-    history.append({"role": role, "content": content})
+    history.append({"role": "user", "content": user_msg})
+    history.append({"role": "assistant", "content": assistant_msg})
 
     max_len = settings.ai_memory_max
     if len(history) > max_len:
+        trimmed = history[:-max_len]
         history = history[-max_len:]
+        try:
+            await memory_repo.insert_memory_messages(user_id, trimmed)
+        except Exception:
+            logger.exception("Failed to persist trimmed memory to database")
 
     r = await _get_redis()
     await r.set(_memory_key(user_id), json.dumps(history, ensure_ascii=False))
 
 
 async def clear_history(user_id: str) -> None:
-    """清空指定用户的对话历史。
+    """清空指定用户的对话历史（Redis + PostgreSQL）。
 
     Args:
         user_id: 用户唯一标识
     """
     r = await _get_redis()
     await r.delete(_memory_key(user_id))
+
+    try:
+        await memory_repo.delete_user_history(user_id)
+    except Exception:
+        logger.exception("Failed to clear persisted memory for user %s", user_id)

@@ -16,6 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, Request
 
 from app.repositories.message_repo import insert_group_at_message
 from app.schemas.qq import GroupMessage, ValidateData, ValidateResponse, WebhookPayload
+from app.ai import memory as ai_memory
 from app.ai import service as ai
 from app.services.qq_bot import qq_bot_service
 
@@ -77,10 +78,20 @@ async def _handle_event(payload: WebhookPayload) -> None:
 
 
 async def _on_group_message(group_msg: GroupMessage) -> None:
-    """处理群聊 @机器人 消息：调用 AI 生成回复并发送。"""
+    """处理群聊 @机器人 消息：识别命令或调用 AI 生成回复。"""
+    user_id = group_msg.author.member_openid
+    content = group_msg.content.strip()
+
+    if content == "/clear":
+        try:
+            await ai_memory.clear_history(user_id)
+            await qq_bot_service.reply_group_message(group_msg, "已清空对话记忆~")
+        except Exception:
+            logger.exception("Failed to clear memory for user %s", user_id)
+        return
+
     try:
-        user_id = group_msg.author.member_openid
-        reply = await ai.chat(user_id, group_msg.content)
+        reply = await ai.chat(user_id, content)
         await qq_bot_service.reply_group_message(group_msg, reply)
     except Exception:
         logger.exception("Failed to reply to group message %s", group_msg.id)

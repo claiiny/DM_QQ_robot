@@ -79,19 +79,19 @@ async def _handle_event(payload: WebhookPayload) -> None:
 
 async def _on_group_message(group_msg: GroupMessage) -> None:
     """处理群聊 @机器人 消息：识别命令或调用 AI 生成回复。"""
-    user_id = group_msg.author.member_openid
+    session_id = f"{group_msg.group_openid}:{group_msg.author.member_openid}"
     content = group_msg.content.strip()
 
     if content == "/clear":
         try:
-            await ai_memory.clear_history(user_id)
+            await ai_memory.clear_history(session_id)
             await qq_bot_service.reply_group_message(group_msg, "已清空对话记忆~")
         except Exception:
-            logger.exception("Failed to clear memory for user %s", user_id)
+            logger.exception("Failed to clear memory for session %s", session_id)
         return
 
     try:
-        reply = await ai.chat(user_id, content)
+        reply = await ai.chat(session_id, content)
         await qq_bot_service.reply_group_message(group_msg, reply)
     except Exception:
         logger.exception("Failed to reply to group message %s", group_msg.id)

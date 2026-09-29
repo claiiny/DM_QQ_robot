@@ -14,8 +14,6 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_FILE_SEND_MARKER = "[SEND_FILE:"
-
 definition = {
     "name": "write_file",
     "description": "将文本内容写入文件。支持各类文本文件（代码、配置、Markdown、纯文本等）。文件保存在服务器指定目录下。可选择是否将文件发送到当前群聊。",
@@ -59,9 +57,8 @@ async def handler(filename: str, content: str, send: bool = False) -> str:
     if send:
         if not settings.public_base_url:
             return f"文件已写入：{filename}（{len(content)} 字节），但发送失败：未配置公开访问地址"
-        return (
-            f"文件已写入：{filename}（{len(content)} 字节）\n"
-            f"{_FILE_SEND_MARKER}{filename}]"
-        )
+        from app.ai.service import add_pending_file
+        add_pending_file(filename)
+        return f"文件已写入：{filename}（{len(content)} 字节），将发送到群聊"
 
     return f"文件已写入：{filename}（{len(content)} 字节）"

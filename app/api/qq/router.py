@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Request
@@ -32,8 +31,6 @@ OP_EVENT = 0
 OP_ACK = 12
 
 EVENT_GROUP_AT_MESSAGE_CREATE = "GROUP_AT_MESSAGE_CREATE"
-
-_FILE_SEND_RE = re.compile(r"\[SEND_FILE:([^\]]+)\]")
 
 
 @router.post("/callback")
@@ -99,8 +96,7 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
         ai.set_group_context(group_msg.group_openid, group_msg.id)
         reply = await ai.chat(session_id, content)
 
-        file_matches = _FILE_SEND_RE.findall(reply)
-        for filename in file_matches:
+        for filename in ai.get_pending_files():
             encoded_filename = quote(filename, safe="")
             file_url = f"{settings.public_base_url}/ai-files/{encoded_filename}"
             logger.info("Sending file: %s, URL: %s", filename, file_url)
@@ -112,7 +108,6 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
             except Exception:
                 logger.exception("Failed to send file: %s", filename)
 
-        reply = _FILE_SEND_RE.sub("", reply).strip()
         if reply:
             await qq_bot_service.reply_group_message(group_msg, reply)
     except Exception:

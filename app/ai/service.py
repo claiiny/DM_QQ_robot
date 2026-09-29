@@ -24,17 +24,29 @@ _client: AsyncOpenAI | None = None
 
 _group_openid_var: ContextVar[str] = ContextVar("group_openid", default="")
 _msg_id_var: ContextVar[str] = ContextVar("msg_id", default="")
+_pending_files_var: ContextVar[list[str]] = ContextVar("pending_files", default=[])
 
 
 def set_group_context(group_openid: str, msg_id: str) -> None:
     """设置当前协程的群聊上下文，供工具（如文件发送）使用。"""
     _group_openid_var.set(group_openid)
     _msg_id_var.set(msg_id)
+    _pending_files_var.set([])
 
 
 def get_group_context() -> tuple[str, str]:
     """获取当前协程的群聊上下文。"""
     return _group_openid_var.get(), _msg_id_var.get()
+
+
+def add_pending_file(filename: str) -> None:
+    """记录一个待发送的文件名。"""
+    _pending_files_var.get().append(filename)
+
+
+def get_pending_files() -> list[str]:
+    """获取所有待发送的文件名。"""
+    return _pending_files_var.get()
 
 
 def _get_client() -> AsyncOpenAI:

@@ -110,6 +110,13 @@ class SendMessageRequest(BaseModel):
     msg_id: str = ""
     event_id: str = ""
     msg_seq: int = 0
+    media: MediaRequest | None = None
+
+
+class MediaRequest(BaseModel):
+    """富媒体消息的媒体信息。"""
+
+    file_info: str
 
 
 class SendMessageResponse(BaseModel):
@@ -117,6 +124,26 @@ class SendMessageResponse(BaseModel):
 
     id: str = ""
     timestamp: str = ""
+
+
+class UploadFileRequest(BaseModel):
+    """群聊富媒体上传请求体。
+
+    Attributes:
+        file_type: 文件类型（1=图片, 2=视频, 3=语音, 4=文件）
+        url: 文件 URL（服务端从该 URL 拉取文件）
+        srv_send_msg: 是否上传后直接发送（false=仅上传获取 file_info）
+    """
+
+    file_type: int
+    url: str
+    srv_send_msg: bool = False
+
+
+class UploadFileResponse(BaseModel):
+    """群聊富媒体上传响应体。"""
+
+    file_info: str = ""
 
 
 class TokenResponse(BaseModel):

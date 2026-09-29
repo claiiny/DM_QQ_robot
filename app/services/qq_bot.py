@@ -20,6 +20,8 @@ from app.schemas.qq import (
     SendMessageRequest,
     SendMessageResponse,
     TokenResponse,
+    UploadFileRequest,
+    UploadFileResponse,
     ValidateData,
 )
 
@@ -129,6 +131,55 @@ class QQBotService:
             content=content,
             msg_type=0,
             msg_id=group_msg.id,
+        )
+        return await self.send_group_message(group_msg.group_openid, message)
+
+    async def upload_group_file(
+        self, group_openid: str, request: UploadFileRequest
+    ) -> UploadFileResponse:
+        """上传富媒体文件到群聊（图片/视频/语音/文件）。
+
+        上传后获得 file_info，用于后续发送富媒体消息（msg_type=7）。
+
+        Args:
+            group_openid: 群的唯一标识
+            request: 上传请求体，包含 file_type、url、srv_send_msg
+
+        Returns:
+            上传结果，包含 file_info
+        """
+        token = await self.get_access_token()
+        resp = await self._http.post(
+            f"/v2/groups/{group_openid}/files",
+            headers=self._auth_headers(token),
+            json=request.model_dump(),
+        )
+        resp.raise_for_status()
+        return UploadFileResponse(**resp.json())
+
+    async def send_group_image(
+        self, group_msg: GroupMessage, image_url: str
+    ) -> SendMessageResponse:
+        """向群聊发送图片消息（富媒体 msg_type=7）。
+
+        先上传获取 file_info，再发送富媒体消息。
+
+        Args:
+            group_msg: 原始群消息对象（用于引用回复）
+            image_url: 图片的 URL 地址
+
+        Returns:
+            发送结果
+        """
+        upload_resp = await self.upload_group_file(
+            group_msg.group_openid,
+            UploadFileRequest(file_type=1, url=image_url),
+        )
+
+        message = SendMessageRequest(
+            msg_type=7,
+            msg_id=group_msg.id,
+            media={"file_info": upload_resp.file_info},
         )
         return await self.send_group_message(group_msg.group_openid, message)
 

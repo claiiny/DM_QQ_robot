@@ -63,7 +63,7 @@ migrations/                 # 数据库 DDL 脚本（按序号递增）
 
 | 模块 | 内容 |
 |------|------|
-| `qq.py` | WebhookPayload、ValidateData/Response、User、GroupMessage、SendMessageRequest/Response、TokenResponse |
+| `qq.py` | WebhookPayload、ValidateData/Response、User、GroupMessage、SendMessageRequest/Response、MediaRequest、UploadFileRequest/Response、TokenResponse |
 
 ### ai/ — AI 模块
 
@@ -100,6 +100,8 @@ migrations/                 # 数据库 DDL 脚本（按序号递增）
 | | | `get_access_token()` — Token 获取与缓存（过期前 60s 刷新） |
 | | | `send_group_message()` — 向群发送消息 |
 | | | `reply_group_message()` — 被动回复群消息 |
+| | | `upload_group_file()` — 上传富媒体文件（图片/视频/语音/文件） |
+| | | `send_group_image()` — 发送群图片消息（msg_type=7） |
 
 ### repositories/ — 数据访问层
 

@@ -78,6 +78,18 @@ async def _handle_event(payload: WebhookPayload) -> None:
         logger.info("Unhandled event type: %s", event_type)
 
 
+def _extract_quoted_content(group_msg: GroupMessage) -> str:
+    """从引用消息中提取被引用的消息内容。"""
+    if not group_msg.parallel_message or not group_msg.parallel_message.msg_nodes:
+        return ""
+    parts = [
+        node.content
+        for node in group_msg.parallel_message.msg_nodes
+        if node.content
+    ]
+    return "\n".join(parts)
+
+
 async def _on_group_message(group_msg: GroupMessage) -> None:
     """处理群聊 @机器人 消息：识别命令或调用 AI 生成回复。"""
     session_id = f"{group_msg.group_openid}:{group_msg.author.member_openid}"
@@ -90,6 +102,11 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
         except Exception:
             logger.exception("Failed to clear memory for session %s", session_id)
         return
+
+    quoted = _extract_quoted_content(group_msg)
+    if quoted:
+        content = f"[引用消息: {quoted}]\n\n{content}"
+        logger.info("Quoted message found: %s", quoted[:200])
 
     try:
         ai.set_group_context(group_msg.group_openid, group_msg.id)

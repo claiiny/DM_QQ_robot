@@ -74,6 +74,19 @@ class MessageAttachment(BaseModel):
     url: str = ""
 
 
+class MsgNode(BaseModel):
+    """引用消息中的节点，包含被引用消息的内容。"""
+
+    message_type: int = 0
+    content: str = ""
+
+
+class ParallelMessage(BaseModel):
+    """引用消息的并行消息结构，包含被引用的消息内容。"""
+
+    msg_nodes: list[MsgNode] = Field(default_factory=list)
+
+
 class GroupMessage(BaseModel):
     """群聊 @机器人 消息事件数据。
 
@@ -88,6 +101,7 @@ class GroupMessage(BaseModel):
         message_scene: 消息场景（可能为 int 或 dict）
         attachments: 附件列表
         mentions: @提及的用户列表
+        parallel_message: 引用消息内容（当消息引用了其他消息时）
     """
 
     id: str = ""
@@ -100,6 +114,7 @@ class GroupMessage(BaseModel):
     message_scene: Any = None
     attachments: list[MessageAttachment] = Field(default_factory=list)
     mentions: list[User] = Field(default_factory=list)
+    parallel_message: ParallelMessage | None = None
 
 
 class SendMessageRequest(BaseModel):

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Request
 
@@ -100,11 +101,14 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
 
         file_matches = _FILE_SEND_RE.findall(reply)
         for filename in file_matches:
-            file_url = f"{settings.public_base_url}/ai-files/{filename}"
+            encoded_filename = quote(filename, safe="")
+            file_url = f"{settings.public_base_url}/ai-files/{encoded_filename}"
+            logger.info("Sending file: %s, URL: %s", filename, file_url)
             try:
                 await qq_bot_service.send_group_file(
                     group_msg.group_openid, file_url, filename
                 )
+                logger.info("File sent successfully: %s", filename)
             except Exception:
                 logger.exception("Failed to send file: %s", filename)
 

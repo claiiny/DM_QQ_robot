@@ -149,11 +149,13 @@ class QQBotService:
             上传结果，包含 file_info
         """
         token = await self.get_access_token()
+        logger.info("Uploading file to group %s, url=%s", group_openid, request.url)
         resp = await self._http.post(
             f"/v2/groups/{group_openid}/files",
             headers=self._auth_headers(token),
             json=request.model_dump(),
         )
+        logger.info("Upload response: status=%s, body=%s", resp.status_code, resp.text[:500])
         resp.raise_for_status()
         return UploadFileResponse(**resp.json())
 
@@ -211,10 +213,12 @@ class QQBotService:
             }
             file_type = qq_file_types.get(ext, 4)
 
+        logger.info("send_group_file: filename=%s, file_type=%d, url=%s", filename, file_type, file_url)
         upload_resp = await self.upload_group_file(
             group_openid,
             UploadFileRequest(file_type=file_type, url=file_url),
         )
+        logger.info("Upload success, file_info=%s", upload_resp.file_info)
         message = SendMessageRequest(
             msg_type=7,
             media={"file_info": upload_resp.file_info},

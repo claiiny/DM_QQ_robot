@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Request
 
@@ -96,17 +95,16 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
         ai.set_group_context(group_msg.group_openid, group_msg.id)
         reply = await ai.chat(session_id, content)
 
-        for filename in ai.get_pending_files():
-            encoded_filename = quote(filename, safe="")
-            file_url = f"{settings.public_base_url}/ai-files/{encoded_filename}"
-            logger.info("Sending file: %s, URL: %s", filename, file_url)
+        for url_name, original_name in ai.get_pending_files():
+            file_url = f"{settings.public_base_url}/ai-files/{url_name}"
+            logger.info("Sending file: %s, URL: %s", original_name, file_url)
             try:
                 await qq_bot_service.send_group_file(
-                    group_msg.group_openid, file_url, filename, msg_id=group_msg.id
+                    group_msg.group_openid, file_url, original_name, msg_id=group_msg.id
                 )
-                logger.info("File sent successfully: %s", filename)
+                logger.info("File sent successfully: %s", original_name)
             except Exception:
-                logger.exception("Failed to send file: %s", filename)
+                logger.exception("Failed to send file: %s", original_name)
 
         if reply:
             await qq_bot_service.reply_group_message(group_msg, reply)

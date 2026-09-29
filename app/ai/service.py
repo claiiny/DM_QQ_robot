@@ -24,7 +24,7 @@ _client: AsyncOpenAI | None = None
 
 _group_openid_var: ContextVar[str] = ContextVar("group_openid", default="")
 _msg_id_var: ContextVar[str] = ContextVar("msg_id", default="")
-_pending_files_var: ContextVar[list[str]] = ContextVar("pending_files", default=[])
+_pending_files_var: ContextVar[list[tuple[str, str]]] = ContextVar("pending_files", default=[])
 
 
 def set_group_context(group_openid: str, msg_id: str) -> None:
@@ -39,13 +39,13 @@ def get_group_context() -> tuple[str, str]:
     return _group_openid_var.get(), _msg_id_var.get()
 
 
-def add_pending_file(filename: str) -> None:
-    """记录一个待发送的文件名。"""
-    _pending_files_var.get().append(filename)
+def add_pending_file(url_name: str, original_name: str) -> None:
+    """记录一个待发送的文件（URL 路径用名 + 原始文件名）。"""
+    _pending_files_var.get().append((url_name, original_name))
 
 
-def get_pending_files() -> list[str]:
-    """获取所有待发送的文件名。"""
+def get_pending_files() -> list[tuple[str, str]]:
+    """获取所有待发送文件，返回 (url_name, original_name) 列表。"""
     return _pending_files_var.get()
 
 

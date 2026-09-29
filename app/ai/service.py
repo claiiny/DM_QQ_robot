@@ -10,6 +10,7 @@ import logging
 
 from openai import AsyncOpenAI
 
+from app.ai.prompt import SYSTEM_PROMPT
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -47,8 +48,8 @@ async def chat(user_message: str) -> str:
     try:
         client = _get_client()
         messages = []
-        if settings.ai_system_prompt:
-            messages.append({"role": "system", "content": settings.ai_system_prompt})
+        if SYSTEM_PROMPT:
+            messages.append({"role": "system", "content": SYSTEM_PROMPT})
         messages.append({"role": "user", "content": user_message})
 
         resp = await client.chat.completions.create(

@@ -42,7 +42,8 @@ backend/
 │   ├── schemas/                # 数据模型层
 │   │   └── qq.py               #   QQ API 数据结构
 │   ├── ai/                     # AI 模块（可扩展多子模块）
-│   │   └── service.py          #   对话服务
+│   │   ├── service.py          #   对话服务
+│   │   └── prompt.py           #   系统提示词
 │   ├── services/               # 业务服务层
 │   │   └── qq_bot.py           #   QQ Bot 服务（签名、Token、消息收发）
 │   ├── repositories/           # 数据访问层

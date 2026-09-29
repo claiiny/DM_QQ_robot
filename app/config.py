@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_base_url: str = ""
     ai_model: str = "gpt-4o-mini"
-    ai_system_prompt: str = "你是一个友好的QQ群聊机器人。"
 
     model_config = {"env_prefix": "QQ_BOT_", "env_file": ".env"}
 

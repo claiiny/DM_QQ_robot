@@ -16,7 +16,8 @@ app/
 ├── schemas/                # 数据模型层：Pydantic 模型定义
 │   └── qq.py               #   QQ API 相关数据结构
 ├── ai/                     # AI 模块：智能对话能力（可扩展多子模块）
-│   └── service.py          #   对话服务（OpenAI 兼容接口）
+│   ├── service.py          #   对话服务（OpenAI 兼容接口）
+│   └── prompt.py           #   系统提示词
 ├── services/               # 业务服务层：封装外部交互与核心逻辑
 │   └── qq_bot.py           #   QQ 机器人服务（签名、Token、消息收发）
 ├── repositories/           # 数据访问层：SQL 操作封装
@@ -66,6 +67,7 @@ app/
 | 子模块 | 职责 |
 |--------|------|
 | `service.py` | 对话服务：调用 OpenAI 兼容接口生成回复（`chat()`） |
+| `prompt.py` | 系统提示词管理：定义 AI 人设与行为约束（`SYSTEM_PROMPT`） |
 
 可扩展方向：多模型路由、RAG 检索增强、工具调用（Function Calling）、对话记忆、向量存储等。
 

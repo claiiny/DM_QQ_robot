@@ -9,6 +9,8 @@ QQ 机器人后端服务，基于 QQ 官方 API v2，通过 Webhook 接收群聊
 - httpx（异步 HTTP 客户端）
 - PyNaCl（Ed25519 签名验证）
 - pydantic-settings（配置管理）
+- asyncpg（PostgreSQL 异步驱动）
+- openai（AI 对话服务）
 - uv（包管理）
 
 ## 快速开始
@@ -32,14 +34,23 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
 backend/
 ├── app/
-│   ├── api/
-│   │   ├── api_qq.py           # QQ Webhook 回调接口
-│   │   └── api_transfer.py     # AI 转发接口（预留）
-│   ├── service/
-│   │   └── qq_bot_service.py   # QQ Bot 服务（Token 管理、签名验证、消息收发）
-│   ├── config.py               # 配置（从环境变量 / .env 读取）
-│   ├── schemas.py              # 数据模型（Webhook 事件、API 请求/响应）
-│   └── main.py                 # FastAPI 应用入口
+│   ├── main.py                 # 应用入口（初始化日志、注册路由）
+│   ├── config.py               # 全局配置（pydantic-settings）
+│   ├── core/                   # 基础设施层
+│   │   ├── logging.py          #   日志初始化
+│   │   └── database.py         #   异步连接池管理
+│   ├── schemas/                # 数据模型层
+│   │   └── qq.py               #   QQ API 数据结构
+│   ├── services/               # 业务服务层
+│   │   ├── qq_bot.py           #   QQ Bot 服务（签名、Token、消息收发）
+│   │   └── ai.py               #   AI 对话服务
+│   ├── repositories/           # 数据访问层
+│   │   └── message_repo.py     #   群聊消息持久化
+│   └── api/                    # 接口层
+│       ├── qq/router.py        #   QQ Webhook 回调路由
+│       └── transfer/router.py  #   AI 转发接口（预留）
+├── docs/
+│   └── design.md               # 模块设计文档
 ├── .env                        # 环境变量（需自行创建）
 ├── pyproject.toml
 ├── README.md
@@ -49,6 +60,7 @@ backend/
 
 ## 相关文档
 
+- [模块设计文档](docs/design.md)
 - [需求文档](req.md)
 - [功能设计文档](func.md)
 - [QQ 机器人官方文档](https://bot.q.qq.com/wiki/develop/api-v2/)

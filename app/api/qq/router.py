@@ -78,16 +78,26 @@ async def _handle_event(payload: WebhookPayload) -> None:
         logger.info("Unhandled event type: %s", event_type)
 
 
-def _extract_quoted_content(group_msg: GroupMessage) -> str:
-    """从引用消息中提取被引用的消息内容。"""
-    if not group_msg.parallel_message or not group_msg.parallel_message.msg_nodes:
-        return ""
-    parts = [
-        node.content
-        for node in group_msg.parallel_message.msg_nodes
-        if node.content
-    ]
-    return "\n".join(parts)
+def _extract_quoted(group_msg: GroupMessage) -> tuple[str, list[str]]:
+    """从引用消息中提取文本内容和图片 URL。
+
+    Returns:
+        (quoted_text, quoted_image_urls) 元组
+    """
+    text_parts: list[str] = []
+    image_urls: list[str] = []
+
+    if group_msg.parallel_message and group_msg.parallel_message.msg_nodes:
+        for node in group_msg.parallel_message.msg_nodes:
+            if node.content and node.content not in ("[图片]", "[动画表情]"):
+                text_parts.append(node.content)
+
+    for elem in group_msg.msg_elements:
+        for att in elem.attachments:
+            if att.content_type.startswith("image") and att.url:
+                image_urls.append(att.url)
+
+    return "\n".join(text_parts), image_urls
 
 
 async def _on_group_message(group_msg: GroupMessage) -> None:
@@ -103,10 +113,17 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
             logger.exception("Failed to clear memory for session %s", session_id)
         return
 
-    quoted = _extract_quoted_content(group_msg)
-    if quoted:
-        content = f"[引用消息: {quoted}]\n\n{content}"
-        logger.info("Quoted message found: %s", quoted[:200])
+    quoted_text, quoted_image_urls = _extract_quoted(group_msg)
+    if quoted_text or quoted_image_urls:
+        author_name = group_msg.author.username or "未知用户"
+        quoted_parts = []
+        if quoted_text:
+            quoted_parts.append(quoted_text)
+        if quoted_image_urls:
+            quoted_parts.append(f"[{len(quoted_image_urls)}张图片]")
+        quoted_desc = " ".join(quoted_parts)
+        content = f"[{author_name}的引用消息: {quoted_desc}]\n\n{content}"
+        logger.info("Quoted message from %s: text=%r, images=%d", author_name, quoted_text[:100], len(quoted_image_urls))
 
     try:
         ai.set_group_context(group_msg.group_openid, group_msg.id)
@@ -115,10 +132,11 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
             att.url for att in group_msg.attachments
             if att.content_type.startswith("image") and att.url
         ]
-        if image_urls:
-            logger.info("Found %d image attachment(s)", len(image_urls))
+        all_image_urls = image_urls + quoted_image_urls
+        if all_image_urls:
+            logger.info("Total images: %d (direct=%d, quoted=%d)", len(all_image_urls), len(image_urls), len(quoted_image_urls))
 
-        reply = await ai.chat(session_id, content, image_urls=image_urls or None)
+        reply = await ai.chat(session_id, content, image_urls=all_image_urls or None)
 
         for url_name, original_name in ai.get_pending_files():
             file_url = f"{settings.public_base_url}/ai-files/{url_name}"

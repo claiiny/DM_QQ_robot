@@ -87,6 +87,14 @@ class ParallelMessage(BaseModel):
     msg_nodes: list[MsgNode] = Field(default_factory=list)
 
 
+class MsgElement(BaseModel):
+    """消息元素，引用消息的图片/文件附件在此字段的 attachments 中。"""
+
+    message_type: int = 0
+    content: str = ""
+    attachments: list[MessageAttachment] = Field(default_factory=list)
+
+
 class GroupMessage(BaseModel):
     """群聊 @机器人 消息事件数据。
 
@@ -102,6 +110,7 @@ class GroupMessage(BaseModel):
         attachments: 附件列表
         mentions: @提及的用户列表
         parallel_message: 引用消息内容（当消息引用了其他消息时）
+        msg_elements: 消息元素列表，引用消息的图片附件在此
     """
 
     id: str = ""
@@ -115,6 +124,7 @@ class GroupMessage(BaseModel):
     attachments: list[MessageAttachment] = Field(default_factory=list)
     mentions: list[User] = Field(default_factory=list)
     parallel_message: ParallelMessage | None = None
+    msg_elements: list[MsgElement] = Field(default_factory=list)
 
 
 class SendMessageRequest(BaseModel):

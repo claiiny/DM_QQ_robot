@@ -79,7 +79,8 @@ async def _handle_event(payload: WebhookPayload) -> None:
 async def _on_group_message(group_msg: GroupMessage) -> None:
     """处理群聊 @机器人 消息：调用 AI 生成回复并发送。"""
     try:
-        reply = await ai.chat(group_msg.content)
+        user_id = group_msg.author.member_openid
+        reply = await ai.chat(user_id, group_msg.content)
         await qq_bot_service.reply_group_message(group_msg, reply)
     except Exception:
         logger.exception("Failed to reply to group message %s", group_msg.id)

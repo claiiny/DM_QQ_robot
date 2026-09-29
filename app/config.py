@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     ai_api_key: str = ""
     ai_base_url: str = ""
     ai_model: str = "gpt-4o-mini"
+    ai_memory_max: int = 20
+
+    redis_host: str = "127.0.0.1"
+    redis_port: int = 6379
+    redis_db: int = 0
 
     model_config = {"env_prefix": "QQ_BOT_", "env_file": ".env"}
 

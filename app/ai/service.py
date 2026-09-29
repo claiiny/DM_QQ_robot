@@ -10,6 +10,7 @@ import logging
 
 from openai import AsyncOpenAI
 
+from app.ai import memory
 from app.ai.prompt import SYSTEM_PROMPT
 from app.config import settings
 
@@ -29,13 +30,14 @@ def _get_client() -> AsyncOpenAI:
     return _client
 
 
-async def chat(user_message: str) -> str:
-    """调用 AI 模型生成回复。
+async def chat(user_id: str, user_message: str) -> str:
+    """调用 AI 模型生成回复，带用户级对话记忆。
 
-    将用户消息发送给 AI 模型，附带系统提示词设定机器人人设。
-    调用失败时返回兜底文案，不影响消息处理流程。
+    从 Redis 加载该用户的历史对话上下文，连同系统提示词一起发送给 AI。
+    回复生成后将本轮对话（用户消息 + AI 回复）存入记忆。
 
     Args:
+        user_id: 用户唯一标识（member_openid），用于隔离对话上下文
         user_message: 用户发送的消息内容
 
     Returns:
@@ -50,13 +52,21 @@ async def chat(user_message: str) -> str:
         messages = []
         if SYSTEM_PROMPT:
             messages.append({"role": "system", "content": SYSTEM_PROMPT})
+
+        history = await memory.get_history(user_id)
+        messages.extend(history)
         messages.append({"role": "user", "content": user_message})
 
         resp = await client.chat.completions.create(
             model=settings.ai_model,
             messages=messages,
         )
-        return resp.choices[0].message.content or ""
+        reply = resp.choices[0].message.content or ""
+
+        await memory.append_message(user_id, "user", user_message)
+        await memory.append_message(user_id, "assistant", reply)
+
+        return reply
     except Exception:
         logger.exception("AI chat failed")
         return "AI 服务暂时不可用"

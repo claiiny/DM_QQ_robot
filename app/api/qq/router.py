@@ -110,7 +110,15 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
 
     try:
         ai.set_group_context(group_msg.group_openid, group_msg.id)
-        reply = await ai.chat(session_id, content)
+
+        image_urls = [
+            att.url for att in group_msg.attachments
+            if att.content_type.startswith("image") and att.url
+        ]
+        if image_urls:
+            logger.info("Found %d image attachment(s)", len(image_urls))
+
+        reply = await ai.chat(session_id, content, image_urls=image_urls or None)
 
         for url_name, original_name in ai.get_pending_files():
             file_url = f"{settings.public_base_url}/ai-files/{url_name}"

@@ -60,7 +60,7 @@ def _get_client() -> AsyncOpenAI:
     return _client
 
 
-async def chat(user_id: str, user_message: str) -> str:
+async def chat(user_id: str, user_message: str, image_urls: list[str] | None = None) -> str:
     """调用 AI 模型生成回复，带用户级对话记忆和工具调用。
 
     AI 可自主决定是否调用工具（如联网搜索），调用结果会注入上下文继续生成。
@@ -69,6 +69,7 @@ async def chat(user_id: str, user_message: str) -> str:
     Args:
         user_id: 用户唯一标识（member_openid），用于隔离对话上下文
         user_message: 用户发送的消息内容
+        image_urls: 用户发送的图片 URL 列表（可选）
 
     Returns:
         AI 生成的回复文本
@@ -79,7 +80,7 @@ async def chat(user_id: str, user_message: str) -> str:
 
     try:
         client = _get_client()
-        reply = await _chat_with_tools(client, user_id, user_message)
+        reply = await _chat_with_tools(client, user_id, user_message, image_urls)
         await memory.save_exchange(user_id, user_message, reply)
         return reply
     except Exception:
@@ -87,24 +88,39 @@ async def chat(user_id: str, user_message: str) -> str:
         return "AI 服务暂时不可用"
 
 
+def _build_user_content(text: str, image_urls: list[str] | None) -> str | list[dict]:
+    """构建用户消息内容，有图片时返回多模态格式。"""
+    if not image_urls:
+        return text
+
+    parts: list[dict] = [{"type": "text", "text": text}]
+    for url in image_urls:
+        parts.append({"type": "image_url", "image_url": {"url": url}})
+    return parts
+
+
 async def _chat_with_tools(
     client: AsyncOpenAI,
     user_id: str,
     user_message: str,
+    image_urls: list[str] | None = None,
 ) -> str:
     """带工具调用的对话循环，支持多轮工具执行。"""
+    has_images = bool(image_urls)
+    model = settings.ai_vision_model if has_images and settings.ai_vision_model else settings.ai_model
+
     messages: list[dict] = []
     if SYSTEM_PROMPT:
         messages.append({"role": "system", "content": SYSTEM_PROMPT})
 
     history = await memory.get_history(user_id)
     messages.extend(history)
-    messages.append({"role": "user", "content": user_message})
+    messages.append({"role": "user", "content": _build_user_content(user_message, image_urls)})
 
     max_tool_rounds = 3
     for _ in range(max_tool_rounds):
         resp = await client.chat.completions.create(
-            model=settings.ai_model,
+            model=model,
             messages=messages,
             tools=TOOLS,
         )
@@ -138,7 +154,7 @@ async def _chat_with_tools(
             )
 
     resp = await client.chat.completions.create(
-        model=settings.ai_model,
+        model=model,
         messages=messages,
     )
     return resp.choices[0].message.content or ""

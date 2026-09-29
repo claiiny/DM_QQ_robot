@@ -112,6 +112,8 @@ class QQBotService:
             headers=self._auth_headers(token),
             json=message.model_dump(exclude_none=True),
         )
+        if resp.status_code != 200:
+            logger.warning("send_group_message failed: status=%s, body=%s", resp.status_code, resp.text[:500])
         resp.raise_for_status()
         return SendMessageResponse(**resp.json())
 
@@ -186,7 +188,7 @@ class QQBotService:
         return await self.send_group_message(group_msg.group_openid, message)
 
     async def send_group_file(
-        self, group_openid: str, file_url: str, filename: str = ""
+        self, group_openid: str, file_url: str, filename: str = "", msg_id: str = ""
     ) -> SendMessageResponse:
         """向群聊发送文件（根据文件名自动判断类型）。
 
@@ -194,6 +196,7 @@ class QQBotService:
             group_openid: 群的唯一标识
             file_url: 文件的公开可访问 URL
             filename: 文件名，用于推断 file_type
+            msg_id: 引用的原消息 ID（被动回复）
 
         Returns:
             发送结果
@@ -221,6 +224,7 @@ class QQBotService:
         logger.info("Upload success, file_info=%s", upload_resp.file_info)
         message = SendMessageRequest(
             msg_type=7,
+            msg_id=msg_id,
             media={"file_info": upload_resp.file_info},
         )
         return await self.send_group_message(group_openid, message)

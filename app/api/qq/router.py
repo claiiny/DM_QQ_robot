@@ -102,7 +102,7 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
             logger.info("Sending file: %s, URL: %s", filename, file_url)
             try:
                 await qq_bot_service.send_group_file(
-                    group_msg.group_openid, file_url, filename
+                    group_msg.group_openid, file_url, filename, msg_id=group_msg.id
                 )
                 logger.info("File sent successfully: %s", filename)
             except Exception:

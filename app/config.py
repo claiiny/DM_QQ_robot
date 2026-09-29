@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     ai_vision_model: str = ""
     ai_vision_api_key: str = ""
     ai_vision_base_url: str = ""
+    ai_image_model: str = ""
+    ai_image_api_key: str = ""
+    ai_image_base_url: str = ""
     ai_memory_max: int = 20
     ai_files_dir: str = "ai_files"
     public_base_url: str = ""

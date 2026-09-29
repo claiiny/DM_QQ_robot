@@ -13,9 +13,9 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from app.ai.tools import file_writer, web_search
+from app.ai.tools import file_writer, image_gen, web_search
 
-_TOOL_MODULES = [web_search, file_writer]
+_TOOL_MODULES = [web_search, file_writer, image_gen]
 
 TOOLS: list[dict[str, Any]] = [
     {"type": "function", "function": mod.definition}

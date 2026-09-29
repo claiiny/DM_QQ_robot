@@ -17,12 +17,15 @@ logger = logging.getLogger(__name__)
 API_URL = "https://api.bochaai.com/v1/web-search"
 
 
-async def search(query: str, count: int = 5) -> str:
+MAX_RESULTS = 10
+
+
+async def search(query: str, count: int = MAX_RESULTS) -> str:
     """调用博查 API 进行联网搜索。
 
     Args:
         query: 搜索关键词
-        count: 返回结果数量（默认 5）
+        count: 返回结果数量（默认 10，最多 10）
 
     Returns:
         格式化的搜索结果文本，包含标题、摘要和链接；
@@ -31,6 +34,8 @@ async def search(query: str, count: int = 5) -> str:
     if not settings.bocha_api_key:
         logger.warning("BOCHA_API_KEY not configured, skipping web search")
         return "联网搜索服务未配置"
+
+    count = min(count, MAX_RESULTS)
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -63,7 +68,7 @@ def _format_results(data: dict) -> str:
     if summary:
         parts.append(f"摘要：{summary}")
 
-    web_pages = result_data.get("webPages", {}).get("value", [])
+    web_pages = result_data.get("webPages", {}).get("value", [])[:MAX_RESULTS]
     if web_pages:
         parts.append("\n搜索结果：")
         for i, page in enumerate(web_pages, 1):

@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ai_base_url: str = ""
     ai_model: str = "gpt-4o-mini"
     ai_memory_max: int = 20
+    ai_files_dir: str = "ai_files"
+    public_base_url: str = ""
 
     bocha_api_key: str = ""
 

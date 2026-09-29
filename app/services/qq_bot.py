@@ -183,5 +183,43 @@ class QQBotService:
         )
         return await self.send_group_message(group_msg.group_openid, message)
 
+    async def send_group_file(
+        self, group_openid: str, file_url: str, filename: str = ""
+    ) -> SendMessageResponse:
+        """向群聊发送文件（根据文件名自动判断类型）。
+
+        Args:
+            group_openid: 群的唯一标识
+            file_url: 文件的公开可访问 URL
+            filename: 文件名，用于推断 file_type
+
+        Returns:
+            发送结果
+        """
+        file_type = 1
+        if filename:
+            ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+            qq_file_types = {
+                "jpg": 1, "jpeg": 1, "png": 1, "gif": 1,
+                "bmp": 1, "webp": 1,
+                "mp4": 2, "avi": 2, "mov": 2,
+                "wav": 3, "mp3": 3, "ogg": 3,
+                "pdf": 4, "doc": 4, "docx": 4,
+                "xls": 4, "xlsx": 4, "ppt": 4,
+                "pptx": 4, "txt": 4, "py": 4,
+                "json": 4, "md": 4, "zip": 4, "csv": 4,
+            }
+            file_type = qq_file_types.get(ext, 4)
+
+        upload_resp = await self.upload_group_file(
+            group_openid,
+            UploadFileRequest(file_type=file_type, url=file_url),
+        )
+        message = SendMessageRequest(
+            msg_type=7,
+            media={"file_info": upload_resp.file_info},
+        )
+        return await self.send_group_message(group_openid, message)
+
 
 qq_bot_service = QQBotService()

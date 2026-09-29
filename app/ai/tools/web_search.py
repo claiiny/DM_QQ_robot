@@ -1,7 +1,6 @@
-"""AI 联网搜索子模块。
+"""联网搜索工具。
 
-基于博查（Bocha）Web Search API，为 AI 对话提供实时联网搜索能力。
-返回格式化的搜索结果摘要，可直接注入 AI 上下文。
+基于博查（Bocha）Web Search API，为 AI 提供实时联网搜索能力。
 """
 
 from __future__ import annotations
@@ -15,22 +14,26 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.bochaai.com/v1/web-search"
-
-
 MAX_RESULTS = 10
 
+definition = {
+    "name": "web_search",
+    "description": "搜索互联网获取实时信息，用于回答时事新闻、天气、价格等需要最新数据的问题。",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "搜索关键词",
+            },
+        },
+        "required": ["query"],
+    },
+}
 
-async def search(query: str, count: int = MAX_RESULTS) -> str:
-    """调用博查 API 进行联网搜索。
 
-    Args:
-        query: 搜索关键词
-        count: 返回结果数量（默认 10，最多 10）
-
-    Returns:
-        格式化的搜索结果文本，包含标题、摘要和链接；
-        搜索失败或无结果时返回提示信息。
-    """
+async def handler(query: str, count: int = MAX_RESULTS) -> str:
+    """调用博查 API 进行联网搜索。"""
     if not settings.bocha_api_key:
         logger.warning("BOCHA_API_KEY not configured, skipping web search")
         return "联网搜索服务未配置"

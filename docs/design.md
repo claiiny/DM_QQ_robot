@@ -19,7 +19,10 @@ app/
 │   ├── service.py          #   对话服务（OpenAI 兼容接口）
 │   ├── prompt.py           #   系统提示词
 │   ├── memory.py           #   对话记忆（Redis 热缓存 + PostgreSQL 持久化）
-│   └── web_search.py       #   联网搜索（博查 Web Search API）
+│   └── tools/              #   Function Calling 工具包
+│       ├── __init__.py     #     工具注册：收集 TOOLS / HANDLERS
+│       ├── web_search.py   #     联网搜索（博查 Web Search API）
+│       └── file_writer.py  #     文件写入（文本文件）
 ├── services/               # 业务服务层：封装外部交互与核心逻辑
 │   └── qq_bot.py           #   QQ 机器人服务（签名、Token、消息收发）
 ├── repositories/           # 数据访问层：SQL 操作封装
@@ -40,12 +43,13 @@ migrations/                 # 数据库 DDL 脚本（按序号递增）
 
 - 调用 `core.logging.setup_logging()` 初始化日志
 - 创建 FastAPI 实例并注册各业务路由
+- 挂载 `ai_files_dir` 为静态文件服务（`/ai-files/`），供 QQ 服务器访问 AI 生成的文件
 - 不包含任何业务逻辑
 
 ### config.py — 全局配置
 
 - 基于 `pydantic-settings`，从环境变量（前缀 `QQ_BOT_`）和 `.env` 文件读取
-- 集中管理 QQ Bot、数据库、AI、博查搜索四组配置项
+- 集中管理 QQ Bot、数据库、AI、博查搜索、Redis、文件写入目录、公开访问地址等配置项
 - 所有模块通过 `from app.config import settings` 获取配置
 
 ### core/ — 基础设施层
@@ -74,19 +78,29 @@ migrations/                 # 数据库 DDL 脚本（按序号递增）
 | `service.py` | 对话服务：调用 OpenAI 兼容接口生成回复（`chat()`），集成记忆上下文与 Function Calling 工具调用 |
 | `prompt.py` | 系统提示词管理：定义 AI 人设与行为约束（`SYSTEM_PROMPT`） |
 | `memory.py` | 对话记忆管理：Redis 热缓存 + PostgreSQL 持久化的混合存储 |
-| `web_search.py` | 联网搜索：调用博查 Web Search API 获取实时搜索结果（`search()`） |
+| `tools/` | Function Calling 工具包：所有工具以子模块形式注册，自动收集 `TOOLS` 和 `HANDLERS` |
 
 **记忆持久化机制：**
 - Redis 保存每个用户最近的对话上下文（默认最多 `ai_memory_max` 条消息）
 - 超出最大长度时，最早的消息被裁剪并批量写入 PostgreSQL（`ais_memory_message` 表）
 - Redis 缓存未命中时（如服务重启），自动从 PostgreSQL 加载最近的历史恢复
-- 每个用户通过 `member_openid` 隔离，互不干扰
+- 每个用户通过 `group_openid:member_openid` 组合键隔离（群+用户维度）
 
-**工具调用机制（Function Calling）：**
-- AI 可通过 Function Calling 自主调用已注册的工具（如联网搜索）
-- 工具定义在 `TOOLS` 列表中，处理器映射在 `_TOOL_HANDLERS` 字典中
+**工具包机制（Function Calling）：**
+- 所有工具以子模块形式组织在 `ai/tools/` 包下
+- 每个工具模块导出 `definition`（OpenAI function 定义字典）和 `handler`（异步处理函数）
+- `tools/__init__.py` 自动收集所有已注册模块，生成 `TOOLS` 列表和 `HANDLERS` 字典
 - 对话循环最多执行 3 轮工具调用，防止无限循环
-- 新增工具只需：① 在 `ai/` 下实现子模块 ② 在 `TOOLS` 注册函数签名 ③ 在 `_TOOL_HANDLERS` 绑定处理器
+- 新增工具只需：① 在 `ai/tools/` 下创建子模块，导出 `definition` 和 `handler` ② 在 `tools/__init__.py` 的 `_TOOL_MODULES` 中注册
+
+**群聊上下文传递：**
+- `service.py` 通过 `contextvars` 传递 `group_openid` 和 `msg_id`，工具可通过 `get_group_context()` 获取
+- 路由层在调用 `chat()` 前通过 `set_group_context()` 设置上下文
+
+**文件写入与发送：**
+- `write_file` 工具支持 `send` 参数，AI 自主决定是否将文件发送到群聊
+- 文件写入后通过 `/ai-files/` 静态文件服务提供公开 URL
+- 工具返回 `[SEND_FILE:filename]` 标记，路由层检测后调用 QQ 富媒体 API 发送文件，并从文本回复中剥离标记
 
 可扩展方向：多模型路由、RAG 检索增强、向量存储等。
 
@@ -102,6 +116,7 @@ migrations/                 # 数据库 DDL 脚本（按序号递增）
 | | | `reply_group_message()` — 被动回复群消息 |
 | | | `upload_group_file()` — 上传富媒体文件（图片/视频/语音/文件） |
 | | | `send_group_image()` — 发送群图片消息（msg_type=7） |
+| | | `send_group_file()` — 发送群文件（自动识别文件类型） |
 
 ### repositories/ — 数据访问层
 
@@ -118,7 +133,7 @@ migrations/                 # 数据库 DDL 脚本（按序号递增）
 
 | 模块 | 路由 | 职责 |
 |------|------|------|
-| `qq/router.py` | `POST /qq/callback` | 接收 QQ Webhook，分发验证/事件处理；支持 `/clear` 命令清空用户记忆 |
+| `qq/router.py` | `POST /qq/callback` | 接收 QQ Webhook，分发验证/事件处理；支持 `/clear` 命令清空用户记忆；检测 AI 回复中的文件发送标记并发送文件 |
 | `transfer/router.py` | `POST /ai/transfer` | AI 转发接口（预留） |
 
 ## 依赖关系
@@ -149,5 +164,6 @@ main.py ──→ core/logging.py
 1. 在 `schemas/` 下新增或扩展数据模型文件
 2. 在 `services/` 下新增业务服务模块
 3. 如需数据库操作，在 `repositories/` 下新增数据访问模块
-4. AI 相关能力在 `ai/` 下新增子模块（如 `rag.py`、`tools.py`）
-5. 在 `api/` 下新增子包和路由，最后在 `main.py` 中注册
+4. AI 相关能力在 `ai/` 下新增子模块（如 `rag.py`）
+5. 新增 Function Calling 工具在 `ai/tools/` 下创建子模块，导出 `definition` 和 `handler`，并在 `tools/__init__.py` 注册
+6. 在 `api/` 下新增子包和路由，最后在 `main.py` 中注册

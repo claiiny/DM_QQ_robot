@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from fastapi import APIRouter, BackgroundTasks, Request
 
@@ -18,6 +19,7 @@ from app.repositories.message_repo import insert_group_at_message
 from app.schemas.qq import GroupMessage, ValidateData, ValidateResponse, WebhookPayload
 from app.ai import memory as ai_memory
 from app.ai import service as ai
+from app.config import settings
 from app.services.qq_bot import qq_bot_service
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,8 @@ OP_EVENT = 0
 OP_ACK = 12
 
 EVENT_GROUP_AT_MESSAGE_CREATE = "GROUP_AT_MESSAGE_CREATE"
+
+_FILE_SEND_RE = re.compile(r"\[SEND_FILE:([^\]]+)\]")
 
 
 @router.post("/callback")
@@ -91,7 +95,21 @@ async def _on_group_message(group_msg: GroupMessage) -> None:
         return
 
     try:
+        ai.set_group_context(group_msg.group_openid, group_msg.id)
         reply = await ai.chat(session_id, content)
-        await qq_bot_service.reply_group_message(group_msg, reply)
+
+        file_matches = _FILE_SEND_RE.findall(reply)
+        for filename in file_matches:
+            file_url = f"{settings.public_base_url}/ai-files/{filename}"
+            try:
+                await qq_bot_service.send_group_file(
+                    group_msg.group_openid, file_url, filename
+                )
+            except Exception:
+                logger.exception("Failed to send file: %s", filename)
+
+        reply = _FILE_SEND_RE.sub("", reply).strip()
+        if reply:
+            await qq_bot_service.reply_group_message(group_msg, reply)
     except Exception:
         logger.exception("Failed to reply to group message %s", group_msg.id)

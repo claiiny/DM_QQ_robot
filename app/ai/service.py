@@ -9,40 +9,32 @@ from __future__ import annotations
 
 import json
 import logging
+from contextvars import ContextVar
 
 from openai import AsyncOpenAI
 
-from app.ai import memory, web_search
+from app.ai import memory
 from app.ai.prompt import SYSTEM_PROMPT
+from app.ai.tools import HANDLERS, TOOLS
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 _client: AsyncOpenAI | None = None
 
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "搜索互联网获取实时信息，用于回答时事新闻、天气、价格等需要最新数据的问题。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "搜索关键词",
-                    },
-                },
-                "required": ["query"],
-            },
-        },
-    },
-]
+_group_openid_var: ContextVar[str] = ContextVar("group_openid", default="")
+_msg_id_var: ContextVar[str] = ContextVar("msg_id", default="")
 
-_TOOL_HANDLERS = {
-    "web_search": web_search.search,
-}
+
+def set_group_context(group_openid: str, msg_id: str) -> None:
+    """设置当前协程的群聊上下文，供工具（如文件发送）使用。"""
+    _group_openid_var.set(group_openid)
+    _msg_id_var.set(msg_id)
+
+
+def get_group_context() -> tuple[str, str]:
+    """获取当前协程的群聊上下文。"""
+    return _group_openid_var.get(), _msg_id_var.get()
 
 
 def _get_client() -> AsyncOpenAI:
@@ -119,7 +111,7 @@ async def _chat_with_tools(
 
             logger.info("AI calling tool: %s(%s)", func_name, func_args)
 
-            handler = _TOOL_HANDLERS.get(func_name)
+            handler = HANDLERS.get(func_name)
             if handler:
                 result = await handler(**func_args)
             else:

@@ -16,7 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, Request
 
 from app.repositories.message_repo import insert_group_at_message
 from app.schemas.qq import GroupMessage, ValidateData, ValidateResponse, WebhookPayload
-from app.services import ai
+from app.ai import service as ai
 from app.services.qq_bot import qq_bot_service
 
 logger = logging.getLogger(__name__)

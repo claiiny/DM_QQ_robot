@@ -15,9 +15,10 @@ app/
 │   └── database.py         #   异步连接池管理（asyncpg）
 ├── schemas/                # 数据模型层：Pydantic 模型定义
 │   └── qq.py               #   QQ API 相关数据结构
+├── ai/                     # AI 模块：智能对话能力（可扩展多子模块）
+│   └── service.py          #   对话服务（OpenAI 兼容接口）
 ├── services/               # 业务服务层：封装外部交互与核心逻辑
-│   ├── qq_bot.py           #   QQ 机器人服务（签名、Token、消息收发）
-│   └── ai.py               #   AI 对话服务（OpenAI 兼容接口）
+│   └── qq_bot.py           #   QQ 机器人服务（签名、Token、消息收发）
 ├── repositories/           # 数据访问层：SQL 操作封装
 │   └── message_repo.py     #   群聊消息持久化
 └── api/                    # 接口层：HTTP 路由定义
@@ -58,6 +59,16 @@ app/
 |------|------|
 | `qq.py` | WebhookPayload、ValidateData/Response、User、GroupMessage、SendMessageRequest/Response、TokenResponse |
 
+### ai/ — AI 模块
+
+独立的一级功能模块，封装所有 AI 相关能力，后续可扩展多个子模块。
+
+| 子模块 | 职责 |
+|--------|------|
+| `service.py` | 对话服务：调用 OpenAI 兼容接口生成回复（`chat()`） |
+
+可扩展方向：多模型路由、RAG 检索增强、工具调用（Function Calling）、对话记忆、向量存储等。
+
 ### services/ — 业务服务层
 
 封装与外部系统的交互逻辑，供 API 层调用。
@@ -68,7 +79,6 @@ app/
 | | | `get_access_token()` — Token 获取与缓存（过期前 60s 刷新） |
 | | | `send_group_message()` — 向群发送消息 |
 | | | `reply_group_message()` — 被动回复群消息 |
-| `ai.py` | AI 对话生成 | `chat()` — 调用 OpenAI 兼容接口生成回复 |
 
 ### repositories/ — 数据访问层
 
@@ -90,14 +100,13 @@ app/
 ## 依赖关系
 
 ```
-api/ ──→ services/
-  │          │
-  │          ├──→ schemas/
+api/ ──→ services/ ──→ schemas/
+  │          │            └──→ config.py
   │          └──→ config.py
   │
-  └──→ repositories/ ──→ core/database.py ──→ config.py
+  ├──→ ai/ ──→ config.py
   │
-  └──→ schemas/
+  └──→ repositories/ ──→ core/database.py ──→ config.py
 
 main.py ──→ core/logging.py
          ──→ api/
@@ -106,7 +115,7 @@ main.py ──→ core/logging.py
 规则：
 - 上层可依赖下层，下层不可反向依赖上层
 - `schemas/` 和 `config.py` 为公共基础，各层均可引用
-- `services/` 之间不互相依赖（当前 AI 与 QQ Bot 独立）
+- `ai/` 为独立一级模块，与 `services/` 平级，互不依赖
 
 ## 扩展指南
 
@@ -114,4 +123,5 @@ main.py ──→ core/logging.py
 1. 在 `schemas/` 下新增或扩展数据模型文件
 2. 在 `services/` 下新增业务服务模块
 3. 如需数据库操作，在 `repositories/` 下新增数据访问模块
-4. 在 `api/` 下新增子包和路由，最后在 `main.py` 中注册
+4. AI 相关能力在 `ai/` 下新增子模块（如 `rag.py`、`tools.py`、`memory.py`）
+5. 在 `api/` 下新增子包和路由，最后在 `main.py` 中注册

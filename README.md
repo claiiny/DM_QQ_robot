@@ -41,9 +41,10 @@ backend/
 │   │   └── database.py         #   异步连接池管理
 │   ├── schemas/                # 数据模型层
 │   │   └── qq.py               #   QQ API 数据结构
+│   ├── ai/                     # AI 模块（可扩展多子模块）
+│   │   └── service.py          #   对话服务
 │   ├── services/               # 业务服务层
-│   │   ├── qq_bot.py           #   QQ Bot 服务（签名、Token、消息收发）
-│   │   └── ai.py               #   AI 对话服务
+│   │   └── qq_bot.py           #   QQ Bot 服务（签名、Token、消息收发）
 │   ├── repositories/           # 数据访问层
 │   │   └── message_repo.py     #   群聊消息持久化
 │   └── api/                    # 接口层
